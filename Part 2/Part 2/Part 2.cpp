@@ -37,7 +37,17 @@ sf::Font font;
 string numToString(int w)
 {
 	stringstream s;
-	if (w >= INT_MAX - 1000)
+	if (w >= INT_MAX - 100000)
+		s << "MAX";
+	else
+		s << w;
+	return s.str();
+}
+string numToString(int w, string n)
+{
+	stringstream s;
+	s << n;
+	if (w >= INT_MAX - 100000)
 		s << "MAX";
 	else
 		s << w;
@@ -97,7 +107,10 @@ void DrawGraph(Graph<pair<string, int>, int> &g, sf::RenderWindow &w, sf::Font f
 
 	for (int i = 0; i < g.GetNodeCount(); i++)
 	{
-		if (g.nodeArray()[i]->marked() == false)
+		if (g.nodeArray()[i]->marked() == false ||
+			g.nodeArray()[i]->isDest() ||
+			g.nodeArray()[i]->isStart() ||
+			g.nodeArray()[i]->isPath())
 			w.draw(g.nodeArray()[i]->GetShape());
 		else
 		{
@@ -106,19 +119,21 @@ void DrawGraph(Graph<pair<string, int>, int> &g, sf::RenderWindow &w, sf::Font f
 		}
 		//Draw Node Name
 		t = g.nodeArray()[i]->GetName();
-		//t.setStyle(t.Bold);
 		t.setFont(f);
 		w.draw(t);
 
+		t.setCharacterSize(12);
+		//t.setStyle(sf::Text::Bold);
+
 		//Draw Node G Value
-		t.setString(numToString(g.nodeArray()[i]->GetG()));
-		t.setPosition(t.getPosition().x-16, t.getPosition().y-16);
+		t.setString(numToString(g.nodeArray()[i]->GetG(), "G : "));
+		t.setPosition(t.getPosition().x+16, t.getPosition().y-16);
 		t.setColor(sf::Color::Magenta);
 		w.draw(t);
 
 		//Draw Node H Value
-		t.setString(numToString(g.nodeArray()[i]->GetH()));
-		t.setPosition(t.getPosition().x + 32, t.getPosition().y);
+		t.setString(numToString(g.nodeArray()[i]->GetH(), "H : "));
+		t.setPosition(t.getPosition().x, t.getPosition().y + 32);
 		t.setColor(sf::Color::Cyan);
 		w.draw(t);
 	}
@@ -163,7 +178,7 @@ void DrawPath(Graph<pair<string, int>, int> &g, sf::RenderWindow &w, vector<Node
 	for (; iter != endIter; ++iter)
 	{
 		Node* tempNode = (*iter);
-		if (!(*iter)->isDest() && !(*iter)->isStart())
+		if ((*iter)->isDest() == false && (*iter)->isStart() == false)
 			(*iter)->ColourPath();
 
 		if (tempNode->getPreviousNode() == NULL)
@@ -187,6 +202,13 @@ void StartButtonPressed(Graph<pair<string, int>, int> &g, vector<Node *> &path)
 	bool dest = false;
 	sf::Vector2i points;
 
+	g.clearMarksAndHeuristics();
+	for (int i = 0; i < g.GetNodeCount(); i++)
+	{
+		g.nodeArray()[i]->resetNodeForMultipath();
+	}
+	path.clear();
+
 	for (int i = 0; i < g.GetNodeCount(); i ++)
 	{
 		if (start == false)
@@ -204,16 +226,50 @@ void StartButtonPressed(Graph<pair<string, int>, int> &g, vector<Node *> &path)
 			g.AStarPathfinding(g.nodeArray()[points.x], g.nodeArray()[points.y], path);
 		}
 	}
-	if (start == false || dest == false)
+	if (start == false && dest == false)
+		cout << "Please Choose Both a Starting node and Destination node" << endl;
+}
+void UCSButtonPressed(Graph<pair<string, int>, int> &g, vector<Node *> &path)
+{
+	bool start = false;
+	bool dest = false;
+	sf::Vector2i points;
+
+	g.clearMarksAndHeuristics();
+	for (int i = 0; i < g.GetNodeCount(); i++)
+	{
+		g.nodeArray()[i]->resetNodeForMultipath();
+	}
+	path.clear();
+
+	for (int i = 0; i < g.GetNodeCount(); i++)
+	{
+		if (start == false)
+		{
+			start = g.nodeArray()[i]->isStart();
+			points.x = i;
+		}
+		if (dest == false)
+		{
+			dest = g.nodeArray()[i]->isDest();
+			points.y = i;
+		}
+		if (start && dest)
+		{
+			g.UCS(g.nodeArray()[points.x], g.nodeArray()[points.y], path);
+		}
+	}
+	if (start == false && dest == false)
 		cout << "Please Choose Both a Starting node and Destination node" << endl;
 }
 void ResetButtonPressed(Graph<pair<string, int>, int> &g, vector<Node *> &path)
 {
-	path.clear();
+	g.clearMarksAndHeuristics();
 	for (int i = 0; i < g.GetNodeCount(); i++)
 	{
-		g.nodeArray()[i]->resetNode();
+		g.nodeArray()[i]->resetNodeForMultipath();
 	}
+	path.clear();
 }
 void RandomButtonPressed(Graph<pair<string, int>, int> &g, vector<Node *> &path)
 {
@@ -250,20 +306,30 @@ void ClickedNode(sf::Vector2i pos, sf::Mouse::Button b, Graph<pair<string, int>,
 			break;
 	}
 }
+void CalculateHeuristicOnSelected(Graph<pair<string, int>, int> &g)
+{
+	int s = getStart(g);
+	int d = getDestination(g);
+
+	if (s != NULL && d != NULL)
+		g.UCSFindHeuristics(g.nodeArray()[s], g.nodeArray()[d]);
+	g.clearMarks();
+}
 
 int main()
 {
 	sf::RenderWindow window(sf::VideoMode(800, 600, 32), "A Star");		//Creates the Rendering Window
 	vector<Node *> path;
-	Button BTN_start(sf::Vector2f(620, 60), "Start");
-	Button BTN_reset(sf::Vector2f(620, 120), "Reset");
-	Button BTN_random(sf::Vector2f(620, 180), "Random");
+	Button BTN_AStar(sf::Vector2f(620, 60), "Start A*");
+	Button BTN_UCS(sf::Vector2f(620, 120), "Start UCS");
+	Button BTN_reset(sf::Vector2f(620, 180), "Reset");
+	Button BTN_random(sf::Vector2f(620, 240), "Random");
 
 	const sf::Mouse mouse;
 
 	sf::Font font;
 	font.loadFromFile("C:\\Windows\\Fonts\\GARA.ttf");
-
+	//font.loadFromFile("Starjedi.ttf");
 	int nodesInGraph = 30;
 	Graph<pair<string, int>, int> graph(nodesInGraph);
 	setUpGraph(graph);
@@ -285,9 +351,12 @@ int main()
 			else
 				b = sf::Mouse::Button::Right;
 			sf::Vector2i pos = mouse.getPosition(window);
-			bool pressed = BTN_start.CheckClicked(pos);
+			bool pressed = BTN_AStar.CheckClicked(pos);
 			if (pressed)
 				StartButtonPressed(graph, path);
+			pressed = BTN_UCS.CheckClicked(pos);
+			if (pressed)
+				UCSButtonPressed(graph, path);
 			pressed = BTN_reset.CheckClicked(pos);
 			if (pressed)
 				ResetButtonPressed(graph, path);
@@ -300,16 +369,20 @@ int main()
 			}
 		}
 
-		window.display();		//Display rendered frame on screen
+		window.clear();
 
 		DrawArcs(graph, window, font);
 		DrawGraph(graph, window, font);
-		BTN_start.Draw(window);
+		BTN_AStar.Draw(window);
+		BTN_UCS.Draw(window);
 		BTN_reset.Draw(window);
 		BTN_random.Draw(window);
 
 		if (!path.empty())
 			DrawPath(graph, window, path);
+		CalculateHeuristicOnSelected(graph);
+
+		window.display();		//Display rendered frame on screen
 	}
 }
 

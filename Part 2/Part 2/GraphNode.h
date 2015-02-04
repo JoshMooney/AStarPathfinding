@@ -51,9 +51,12 @@ public:
 		m_text.setString(getData().first);
 		m_text.setCharacterSize(20);
 		//m_text.setOrigin(sf::Vector2f(m_position.x + 16, m_position.y + 16));
-		m_textPosition = sf::Vector2f(m_position.x+8, m_position.y+8);
+		m_textPosition = sf::Vector2f(m_position.x+8, m_position.y+6);
 		m_text.setPosition(m_textPosition);
 		m_text.setColor(sf::Color::Blue);
+
+		m_g = INT_MAX - 10000;
+		m_h = INT_MAX - 10000;
 
 		m_circle.setPosition(m_position);
 		m_circle.setRadius(m_radius);
@@ -69,6 +72,7 @@ public:
 	//Colour Nodes
 	void setStart();
 	void setDestination();
+	void resetNodeForMultipath();
 	void resetNode();
 	bool resetNode(sf::Color col);
 	void Visited();
@@ -76,12 +80,12 @@ public:
 
 	bool Contains(sf::Vector2i pos);
 
-	int GetG()	{ return m_data.second; }
-	void SetG(NodeType set)	{ m_g = set; }
+	int GetG()	{ return m_g; }
+	void SetG(int set)	{ m_g = set; }
 	int GetH()	{	return m_h;	}
 	void SetH(int set)	{ m_h = set; }
 
-	int GetF()	{ return m_data.second; }
+	int GetF()	{ return m_g + m_h; }
 	void SetF(int set)	{ m_f = set; }
 
 	GraphNode()
@@ -130,6 +134,7 @@ public:
     void removeArc( Node* pNode );
 	bool isStart();
 	bool isDest();
+	bool isPath();
 	void DrawArcs(sf::RenderWindow &w);
 };
 
@@ -257,6 +262,16 @@ void GraphNode<NodeType, ArcType>::resetNode()
 }
 
 template<typename NodeType, typename ArcType>
+void GraphNode<NodeType, ArcType>::resetNodeForMultipath()
+{
+	if (m_circle.getFillColor() == grey ||
+		m_circle.getFillColor() == sf::Color::Yellow)
+	{
+		m_circle.setFillColor(sf::Color::White);
+	}
+}
+
+template<typename NodeType, typename ArcType>
 bool GraphNode<NodeType, ArcType>::resetNode(sf::Color col)
 {
 	if (m_circle.getFillColor() == col)
@@ -290,6 +305,14 @@ template<typename NodeType, typename ArcType>
 bool GraphNode<NodeType, ArcType>::isDest()
 {
 	if (m_circle.getFillColor() == sf::Color::Red)
+		return true;
+	return false;
+}
+
+template<typename NodeType, typename ArcType>
+bool GraphNode<NodeType, ArcType>::isPath()
+{
+	if (m_circle.getFillColor() == sf::Color::Yellow)
 		return true;
 	return false;
 }

@@ -58,6 +58,8 @@ public:
 	void removeArc( int from, int to );
 	Arc* getArc( int from, int to );        
 	void clearMarks();
+	void clearMarksAndNotSelected();
+	void clearMarksAndHeuristics();
 	void depthFirst( Node* pNode, void (*pProcess)(Node*) );
 	void breadthFirst( Node* pNode, void (*pProcess)(Node*) );
 	void breadthFirstSearch(Node* pNode, Node* target, void(*pProcess)(Node*));
@@ -83,7 +85,17 @@ class NodeSearchCostComparer
 public:
 	bool operator()(GraphNode<NodeType, ArcType> * n1, GraphNode<NodeType, ArcType> * n2)
 	{
-		return n1->getData().second > n2->getData().second;		//get F here
+		return n1->GetF() > n2->GetF();		//get F here
+	}
+};
+
+template<class NodeType, class ArcType>
+class UCSNodeSearchCostComparer
+{
+public:
+	bool operator()(GraphNode<NodeType, ArcType> * n1, GraphNode<NodeType, ArcType> * n2)
+	{
+		return n1->getData().second > n2->getData().second;		
 	}
 };
 
@@ -278,8 +290,39 @@ void Graph<NodeType, ArcType>::clearMarks() {
 	 for( index = 0; index < m_maxNodes; index++ ) {
 		  if( m_pNodes[index] != 0 ) {
 			  m_pNodes[index]->setMarked(false);
+			  m_pNodes[index]->setPreviousNode(NULL);
+			  m_pNodes[index]->setData(pair<string, int>(m_pNodes[index]->getData().first, INT_MAX - 10000));
 		  }
 	 }
+}
+
+template<class NodeType, class ArcType>
+void Graph<NodeType, ArcType>::clearMarksAndNotSelected() {
+	int index;
+	for (index = 0; index < m_maxNodes; index++) {
+		if (m_pNodes[index] != 0) {
+			m_pNodes[index]->setMarked(false);
+			m_pNodes[index]->setPreviousNode(NULL);
+			//m_pNodes[index]->SetG(INT_MAX - 10000);
+			m_pNodes[index]->SetH(INT_MAX - 10000);
+			m_pNodes[index]->setData(pair<string, int>(m_pNodes[index]->getData().first, INT_MAX - 10000));
+		}
+	}
+}
+
+template<class NodeType, class ArcType>
+void Graph<NodeType, ArcType>::clearMarksAndHeuristics()
+{
+	int index;
+	for (index = 0; index < m_maxNodes; index++) {
+		if (m_pNodes[index] != 0) {
+			m_pNodes[index]->setMarked(false);
+			m_pNodes[index]->setPreviousNode(NULL);
+			m_pNodes[index]->SetG(INT_MAX - 10000);
+			m_pNodes[index]->SetH(INT_MAX - 10000);
+			m_pNodes[index]->setData(pair<string, int>(m_pNodes[index]->getData().first, INT_MAX - 10000));
+		}
+	}
 }
 
 // ----------------------------------------------------------------
@@ -459,8 +502,8 @@ void Graph<NodeType, ArcType>::UCS(Node* pStart, Node* pDest, vector<Node *> & p
 template<class NodeType, class ArcType>
 void Graph<NodeType, ArcType>::UCS(Node* pStart, Node* pDest, vector<Node *> & path)
 {
-	UnmarkNodes(pStart);		//Unmarks all nodes sets there weight to max and sets there previous pointer to NULL
-	priority_queue<Node*, vector<Node*>, NodeSearchCostComparer<NodeType, ArcType>> pq;		//create a new priority Queue 
+	clearMarks();		//Unmarks all nodes sets there weight to max and sets there previous pointer to NULL
+	priority_queue<Node*, vector<Node*>, UCSNodeSearchCostComparer<NodeType, ArcType>> pq;		//create a new priority Queue 
 	pStart->setData(pair<string, int>(pStart->getData().first, 0));
 	
 	pq.push(pStart);
@@ -490,6 +533,8 @@ void Graph<NodeType, ArcType>::UCS(Node* pStart, Node* pDest, vector<Node *> & p
 		}//End For
 		//CalculateHeuristic(pq.top(), pDest);
 		pq.pop();
+		if (!pq.empty())
+			make_heap(const_cast<Node**>(&pq.top()), const_cast<Node**>(&pq.top()) + pq.size(), UCSNodeSearchCostComparer<NodeType, ArcType>());
 	}//End While
 
 	while (pDest->getPreviousNode() != NULL)
@@ -540,6 +585,9 @@ void Graph<NodeType, ArcType>::UCSFindAllPaths(Node* pStart, vector<pair<string,
 		}
 		
 		pq.pop();
+		if (!pq.empty())
+			make_heap(const_cast<Node**>(&pq.top()), const_cast<Node**>(&pq.top()) + pq.size(), NodeSearchCostComparer<NodeType, ArcType>());
+
 	}
 	cout << endl;
 }
@@ -567,6 +615,8 @@ void Graph<NodeType, ArcType>::UnmarkNodes(Node* pCurrent)
 			}
 		}
 		pq.pop();
+		if (!pq.empty())
+			make_heap(const_cast<Node**>(&pq.top()), const_cast<Node**>(&pq.top()) + pq.size(), NodeSearchCostComparer<NodeType, ArcType>());
 	}
 }
 
@@ -580,13 +630,13 @@ void Graph<NodeType, ArcType>::setValueToInfinate(Node* pNode)
 template<class NodeType, class ArcType>
 void Graph<NodeType, ArcType>::AStarPathfinding(Node* pStart, Node* pTarget, vector<Node *> & path)
 {
-	vector<Node *> pathfinding;
-	UCS(pStart, pTarget, pathfinding);		//Does the Hueristics of the route from Target to Start
+	UCSFindHeuristics(pStart, pTarget);		//Does the Hueristics of the route from Target to Start
 
-	UnmarkNodes(pStart);		//Unmarks all nodes sets there weight to max and sets there previous pointer to NULL
+	clearMarks();		//Unmarks all nodes sets there weight to max and sets there previous pointer to NULL
 	priority_queue<Node*, vector<Node*>, NodeSearchCostComparer<NodeType, ArcType>> pq;		//create a new priority Queue 
 	
 	pStart->setData(pair<string, int>(pStart->getData().first, 0));	//Initalise the starting Node weight to Zero
+	pStart->SetG(0);
 	pStart->setMarked(true);		//Marks the Starting Node
 	pq.push(pStart);				//Puts the starting node in the priority queue
 
@@ -604,7 +654,7 @@ void Graph<NodeType, ArcType>::AStarPathfinding(Node* pStart, Node* pTarget, vec
 				int fn = (*iter).node()->GetH() + hn;		 
 				if (fn < (*iter).node()->GetF())		
 				{
-					(*iter).node()->SetF(fn);
+					(*iter).node()->SetG(fn);
 					(*iter).node()->setPreviousNode(pq.top());
 
 					(*iter).node()->setData(pair<string, int>((*iter).node()->getData().first, fn));
@@ -617,7 +667,12 @@ void Graph<NodeType, ArcType>::AStarPathfinding(Node* pStart, Node* pTarget, vec
 				}//End if
 			}//End if
 		}//End For
+		if (pq.top()->getData().first == "T") {
+			int x = 0;
+		}
 		pq.pop();
+		if (!pq.empty())
+			make_heap(const_cast<Node**>(&pq.top()), const_cast<Node**>(&pq.top()) + pq.size(), NodeSearchCostComparer<NodeType, ArcType>());
 	}//End While
 
 	while (pTarget->getPreviousNode() != NULL)
@@ -640,8 +695,9 @@ void Graph<NodeType, ArcType>::CalculateHeuristic(Node * node, Node * dest)
 template<class NodeType, class ArcType>
 void Graph<NodeType, ArcType>::UCSFindHeuristics(Node* pStart, Node* pDest)
 {
-	UnmarkNodes(pStart);		//Unmarks all nodes sets there weight to max and sets there previous pointer to NULL
-	priority_queue<Node*, vector<Node*>, NodeSearchCostComparer<NodeType, ArcType>> pq;		//create a new priority Queue 
+	clearMarksAndNotSelected();		//Unmarks all nodes sets there weight to max and sets there previous pointer to NULL
+
+	priority_queue<Node*, vector<Node*>, UCSNodeSearchCostComparer<NodeType, ArcType>> pq;		//create a new priority Queue 
 	pStart->setData(pair<string, int>(pStart->getData().first, 0));
 	pq.push(pStart);
 	pStart->setMarked(true);
@@ -670,8 +726,10 @@ void Graph<NodeType, ArcType>::UCSFindHeuristics(Node* pStart, Node* pDest)
 				}//End if
 			}//End if
 		}//End For
-		CalculateHeuristic(pq.top(), pStart);
+		CalculateHeuristic(pq.top(), pDest);
 		pq.pop();
+		if (!pq.empty())
+			make_heap(const_cast<Node**>(&pq.top()), const_cast<Node**>(&pq.top()) + pq.size(), class UCSNodeSearchCostComparer<NodeType, ArcType>());
 	}//End While
 }
 
