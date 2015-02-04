@@ -1,0 +1,25 @@
+Let s = the starting node, g = goal node
+Let pq = a new priority queue
+Initialise g[s] to 0  
+For each node v in graph G
+	Calculate h[v] // Compute estimated distance to goal for each node.
+   Initialise g[v] to infinity // Don’t yet know the distances to these nodes 
+
+Add s to the pq
+Mark(s)
+While the queue is not empty AND pq.top() != g
+	For each child node c of pq.top()
+       If (c != previous(pq.top() AND c has not been removed from the pq)
+	        Let distC = h(c) + g(c) // g(c) is actual path cost to child
+           If ( distC < f(c) )
+              let f[c] = distC
+              Set previous pointer of c to pq.top()
+           End if
+  	        If (notMarked(c))
+		          Add c to the pq 
+		          Mark(c)
+           End if
+		  End if
+	End for
+   Remove pq.top()	
+End while
